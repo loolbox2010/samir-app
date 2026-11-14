@@ -17,6 +17,8 @@ object Store {
     const val K_WEB = "webSearch"
     const val K_MEMORY = "memoryMode"
     const val K_VOICE = "voiceName"
+    const val K_CONFIRM_CALL = "confirmCalls"
+    const val K_ANNOUNCE = "announceCalls"
     const val K_STATUS = "status"
     const val K_HISTORY = "history"
     const val K_RUNNING = "running"
@@ -41,6 +43,8 @@ object Store {
     fun webSearch(c: Context) = prefs(c).getBoolean(K_WEB, true)
     fun memory(c: Context) = prefs(c).getBoolean(K_MEMORY, true)
     fun voice(c: Context) = str(c, K_VOICE, "")
+    fun confirmCalls(c: Context) = prefs(c).getBoolean(K_CONFIRM_CALL, true)
+    fun announceCalls(c: Context) = prefs(c).getBoolean(K_ANNOUNCE, true)
     fun status(c: Context) = str(c, K_STATUS, "متوقف")
 
     fun put(c: Context, key: String, value: String) {

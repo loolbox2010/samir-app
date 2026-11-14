@@ -213,6 +213,28 @@ class MainActivity : Activity() {
             Store.put(this, Store.K_USER, it.trim())
         }
 
+        val announce = CheckBox(this).apply {
+            text = "أعلن عن المتصل وانتظر أمري (رد / ارفض)"
+            textSize = 15f
+            setTextColor(ink)
+            isChecked = Store.announceCalls(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Store.putBool(this@MainActivity, Store.K_ANNOUNCE, checked) }
+        }
+        settingsBox.addView(announce, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+
+        val confirmCall = CheckBox(this).apply {
+            text = "اسألني قبل أن تتصل بأحد"
+            textSize = 15f
+            setTextColor(ink)
+            isChecked = Store.confirmCalls(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Store.putBool(this@MainActivity, Store.K_CONFIRM_CALL, checked) }
+        }
+        settingsBox.addView(confirmCall, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+
         val voiceBtn = button("اختر صوت سمير", false) { pickVoice() }
         settingsBox.addView(voiceBtn, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -402,6 +424,7 @@ class MainActivity : Activity() {
     private fun withPermissions(action: () -> Unit) {
         val needed = mutableListOf(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= 33) needed.add(Manifest.permission.POST_NOTIFICATIONS)
+        needed.addAll(Phone.PERMISSIONS)
         val missing = needed.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isEmpty()) {
             action()
