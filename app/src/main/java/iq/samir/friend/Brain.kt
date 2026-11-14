@@ -16,7 +16,7 @@ class BrainException(message: String) : Exception(message)
 object Brain {
     private const val API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-    private fun systemPrompt(c: Context, web: Boolean): String {
+    private fun systemPrompt(c: Context, web: Boolean, question: String): String {
         val wake = Store.wake(c)
         val user = Store.userName(c)
         val now = try {
@@ -37,21 +37,32 @@ object Brain {
             "أنت ذكاء اصطناعي ولا تدّعي أنك إنسان. اهتم به بصدق وشجّعه على التواصل مع أهله وأصدقائه.",
             if (now.isNotEmpty()) "الوقت الآن عند المستخدم: $now. المستخدم في العراق." else "",
             if (web) "عندك أداة بحث في الإنترنت. استخدمها لكل ما يتغير مع الوقت: الأخبار، الأسعار، الطقس، المباريات، المناصب، وأي معلومة لست متأكداً منها. لا تستخدمها للأحاديث العادية. اذكر المصدر باسمه فقط (مثل: حسب الجزيرة) بلا روابط."
-            else "لا يمكنك البحث في الإنترنت الآن؛ إذا سُئلت عن أخبار أو معلومات حديثة فقل إنك لا تملك معلومات محدثة."
+            else "لا يمكنك البحث في الإنترنت الآن؛ إذا سُئلت عن أخبار أو معلومات حديثة فقل إنك لا تملك معلومات محدثة.",
+            memoryBlock(c, question)
         ).filter { it.isNotEmpty() }.joinToString("\n")
+    }
+
+    private fun memoryBlock(c: Context, question: String): String {
+        if (!Store.memory(c)) return ""
+        val log = Journal.context(c, question)
+        if (log.isEmpty()) return ""
+        return "\nأنت تستمع لما يدور حول المستخدم وتحفظه نصاً. هذا سجل ما سمعته (محادثاته مع الآخرين)، مكتوب آلياً من التعرف على الصوت، وقد يحتوي أخطاء، ولا يميّز من المتكلم. " +
+            "استخدمه عندما يسأل المستخدم عن شيء قيل أو اتُّفق عليه أو يطلب ملخصاً، واذكر الوقت إن فاد. لا تخترع ما ليس في السجل؛ إذا لم تجد الجواب فقل ذلك. لا تذكر السجل إذا لم يكن له علاقة بالسؤال.\n" +
+            "----- بداية السجل -----\n$log\n----- نهاية السجل -----"
     }
 
     private fun buildBody(c: Context, web: Boolean): String {
         val hist = Store.history(c).takeLast(24).toMutableList()
         while (hist.isNotEmpty() && hist[0].role != "user") hist.removeAt(0)
 
+        val question = hist.lastOrNull { it.role == "user" }?.content.orEmpty()
         val messages = JSONArray()
-        messages.put(JSONObject().put("role", "system").put("content", systemPrompt(c, web)))
+        messages.put(JSONObject().put("role", "system").put("content", systemPrompt(c, web, question)))
         hist.forEach { messages.put(JSONObject().put("role", it.role).put("content", it.content)) }
 
         val body = JSONObject()
             .put("model", Store.model(c))
-            .put("max_tokens", 600)
+            .put("max_tokens", 800)
             .put("messages", messages)
 
         if (web) {

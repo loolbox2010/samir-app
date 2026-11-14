@@ -2,6 +2,7 @@ package iq.samir.friend
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -208,6 +209,46 @@ class MainActivity : Activity() {
         field("اسمك", Store.userName(this), hint = "حتى يناديك باسمك") {
             Store.put(this, Store.K_USER, it.trim())
         }
+
+        val memory = CheckBox(this).apply {
+            text = "وضع الذاكرة: احفظ كل كلام يسمعه نصاً على الهاتف"
+            textSize = 15f
+            setTextColor(ink)
+            isChecked = Store.memory(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Store.putBool(this@MainActivity, Store.K_MEMORY, checked) }
+        }
+        settingsBox.addView(memory, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+
+        val showLog = button("عرض سجل اليوم", false) {
+            val text = Journal.today(this).ifBlank { "لا يوجد كلام محفوظ اليوم." }
+            AlertDialog.Builder(this)
+                .setTitle("سجل اليوم")
+                .setMessage(text)
+                .setPositiveButton("إغلاق", null)
+                .show()
+        }
+        settingsBox.addView(showLog, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+
+        val clearLog = button("امسح كل السجل", false) {
+            AlertDialog.Builder(this)
+                .setTitle("مسح السجل")
+                .setMessage("سيُحذف كل الكلام المحفوظ نهائياً من الهاتف. متأكد؟")
+                .setPositiveButton("امسح") { _, _ ->
+                    Journal.clear(this)
+                    Toast.makeText(this, "تم مسح السجل", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("إلغاء", null)
+                .show()
+        }
+        clearLog.setTextColor(warn)
+        clearLog.background = rounded(Color.TRANSPARENT, 14, warn)
+        settingsBox.addView(clearLog, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
 
         val web = CheckBox(this).apply {
             text = "البحث في الإنترنت (أخبار، أسعار، طقس… يحتاج رصيداً في OpenRouter)"

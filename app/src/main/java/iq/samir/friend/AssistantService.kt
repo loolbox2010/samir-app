@@ -170,7 +170,9 @@ class AssistantService : Service(), RecognitionListener, TextToSpeech.OnInitList
         }
     }
 
-    private fun wakeStatus() = "نادِني «${Store.wake(this)}» وأسمعك"
+    private fun wakeStatus(): String =
+        if (Store.memory(this)) "● يحفظ ما يسمعه (${Journal.todayCount(this)} اليوم) · نادِني «${Store.wake(this)}»"
+        else "نادِني «${Store.wake(this)}» وأسمعك"
 
     // ---------------- الطاقة والصوت ----------------
 
@@ -376,6 +378,14 @@ class AssistantService : Service(), RecognitionListener, TextToSpeech.OnInitList
                         val words = rest.split(Regex("\\s+")).filter { it.isNotBlank() }
                         if (words.size >= 2) ask(rest) else speak("نعم؟", "ack")
                         return
+                    }
+                }
+                // لم يُنادَ: نحفظ الكلام في السجل بصمت
+                if (Store.memory(this)) {
+                    val heard = results.firstOrNull()?.trim().orEmpty()
+                    if (heard.isNotEmpty()) {
+                        Journal.add(this, heard)
+                        setMode(Mode.WAKE, wakeStatus())
                     }
                 }
                 scheduleListen(100)
