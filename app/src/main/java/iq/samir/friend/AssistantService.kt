@@ -79,7 +79,7 @@ class AssistantService : Service(), RecognitionListener, TextToSpeech.OnInitList
                 setShowBadge(false)
             }
         )
-        tts = TextToSpeech(this, this)
+        tts = Voices.create(this, this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -190,15 +190,19 @@ class AssistantService : Service(), RecognitionListener, TextToSpeech.OnInitList
     /** يكتم صوت الوسائط أثناء الانتظار حتى لا تُسمع نغمة الميكروفون كل بضع ثوانٍ. */
     private fun mute(on: Boolean) {
         if (on == muted) return
-        try {
-            audio.adjustStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                if (on) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
-                0
-            )
-            muted = on
-        } catch (_: Exception) {
+        // نغمة الميكروفون تُعزف على قناة مختلفة حسب الهاتف، فنكتمها كلها أثناء الانتظار
+        val streams = intArrayOf(
+            AudioManager.STREAM_MUSIC,
+            AudioManager.STREAM_NOTIFICATION,
+            AudioManager.STREAM_SYSTEM
+        )
+        for (s in streams) {
+            try {
+                audio.adjustStreamVolume(s, if (on) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE, 0)
+            } catch (_: Exception) {
+            }
         }
+        muted = on
     }
 
     private fun shutdown() {
@@ -435,8 +439,9 @@ class AssistantService : Service(), RecognitionListener, TextToSpeech.OnInitList
             Store.setStatus(this, "محرك النطق لا يعمل. ثبّت «Google Speech Services».")
             return
         }
-        val r = engine.setLanguage(Locale("ar"))
-        ttsReady = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED
+        ttsReady = Voices.apply(this, engine)
+        engine.setSpeechRate(0.95f)
+        engine.setPitch(1.0f)
         if (!ttsReady) {
             Store.setStatus(this, "صوت العربية غير مثبت. ثبّته من إعدادات النطق في الهاتف.")
         }
@@ -472,8 +477,10 @@ class AssistantService : Service(), RecognitionListener, TextToSpeech.OnInitList
             afterSpeech(id)
             return
         }
+        Voices.apply(this, engine)
+        val spoken = Voices.forSpeech(text)
         val max = TextToSpeech.getMaxSpeechInputLength() - 10
-        val safe = if (text.length > max) text.substring(0, max) else text
+        val safe = if (spoken.length > max) spoken.substring(0, max) else spoken
         val res = engine.speak(safe, TextToSpeech.QUEUE_FLUSH, Bundle(), id)
         if (res != TextToSpeech.SUCCESS) afterSpeech(id)
     }

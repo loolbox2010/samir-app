@@ -14,6 +14,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -48,6 +50,7 @@ class MainActivity : Activity() {
     private lateinit var batteryBtn: Button
 
     private var pendingAction: (() -> Unit)? = null
+    private var previewTts: TextToSpeech? = null
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         runOnUiThread {
@@ -209,6 +212,16 @@ class MainActivity : Activity() {
         field("اسمك", Store.userName(this), hint = "حتى يناديك باسمك") {
             Store.put(this, Store.K_USER, it.trim())
         }
+
+        val voiceBtn = button("اختر صوت سمير", false) { pickVoice() }
+        settingsBox.addView(voiceBtn, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+
+        val ttsSettings = button("تثبيت أصوات عربية أوضح", false) { openTtsSettings() }
+        settingsBox.addView(ttsSettings, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
 
         val memory = CheckBox(this).apply {
             text = "وضع الذاكرة: احفظ كل كلام يسمعه نصاً على الهاتف"
@@ -407,6 +420,85 @@ class MainActivity : Activity() {
         } else {
             Toast.makeText(this, "لازم تسمح بالميكروفون حتى يسمعك", Toast.LENGTH_LONG).show()
         }
+    }
+
+    // ---------------- الصوت ----------------
+
+    private fun pickVoice() {
+        val existing = previewTts
+        if (existing != null) {
+            showVoices(existing)
+            return
+        }
+        Toast.makeText(this, "جاري تحميل الأصوات…", Toast.LENGTH_SHORT).show()
+        var engine: TextToSpeech? = null
+        engine = Voices.create(this) { status ->
+            runOnUiThread {
+                val e = engine ?: return@runOnUiThread
+                if (status == TextToSpeech.SUCCESS) {
+                    previewTts = e
+                    showVoices(e)
+                } else {
+                    Toast.makeText(this, "محرك النطق لا يعمل. ثبّت Google Speech Services.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun showVoices(engine: TextToSpeech) {
+        val list: List<Voice> = Voices.arabic(engine)
+        if (list.isEmpty()) {
+            Toast.makeText(this, "لا توجد أصوات عربية مثبتة. اضغط «تثبيت أصوات عربية أوضح».", Toast.LENGTH_LONG).show()
+            return
+        }
+        val current = Store.voice(this)
+        val names = list.mapIndexed { i, v ->
+            Voices.label(v, i) + if (v.name == current) "  ✓" else ""
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("اختر صوتاً (يُسمعك مثالاً عند الضغط)")
+            .setItems(names) { _, which ->
+                val v = list[which]
+                Store.put(this, Store.K_VOICE, v.name)
+                try {
+                    engine.voice = v
+                    engine.setSpeechRate(0.95f)
+                    engine.speak(
+                        "هلا بيك، أنا ${Store.wake(this)}. هذا صوتي الجديد، هل هو واضح؟",
+                        TextToSpeech.QUEUE_FLUSH, null, "preview"
+                    )
+                } catch (_: Exception) {
+                }
+                Toast.makeText(this, "تم اختيار " + Voices.label(v, which), Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("إغلاق", null)
+            .show()
+    }
+
+    private fun openTtsSettings() {
+        val intents = listOf(
+            Intent("com.android.settings.TTS_SETTINGS"),
+            Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).setPackage(Voices.GOOGLE_TTS),
+            Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + Voices.GOOGLE_TTS))
+        )
+        for (i in intents) {
+            try {
+                startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                Toast.makeText(this, "اختر محرك Google ثم ثبّت صوت العربية", Toast.LENGTH_LONG).show()
+                return
+            } catch (_: Exception) {
+            }
+        }
+        Toast.makeText(this, "افتح إعدادات الهاتف ← تحويل النص إلى كلام", Toast.LENGTH_LONG).show()
+    }
+
+    override fun onDestroy() {
+        try {
+            previewTts?.shutdown()
+        } catch (_: Exception) {
+        }
+        previewTts = null
+        super.onDestroy()
     }
 
     private fun askBattery() {
