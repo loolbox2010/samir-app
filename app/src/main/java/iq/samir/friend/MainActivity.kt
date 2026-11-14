@@ -209,6 +209,17 @@ class MainActivity : Activity() {
             Store.put(this, Store.K_USER, it.trim())
         }
 
+        val web = CheckBox(this).apply {
+            text = "البحث في الإنترنت (أخبار، أسعار، طقس… يحتاج رصيداً في OpenRouter)"
+            textSize = 15f
+            setTextColor(ink)
+            isChecked = Store.webSearch(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Store.putBool(this@MainActivity, Store.K_WEB, checked) }
+        }
+        settingsBox.addView(web, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+
         val mute = CheckBox(this).apply {
             text = "إخفاء نغمة الميكروفون (يكتم صوت الوسائط أثناء الانتظار)"
             textSize = 15f
